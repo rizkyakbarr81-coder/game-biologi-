@@ -1,0 +1,1151 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>html{color-scheme:dark}body{margin:0}</style>
+<title>BioMonster Dunia</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;800&display=swap">
+<style>
+/* Layout: satu layar penuh. Bilah status di atas, dunia (kanvas) mengisi sisa layar, kartu pertarungan menutup dunia saat bertemu monster. */
+:root{
+  --ink:#130f2b;
+  --slide:#1c1740;
+  --slide-2:#2a2358;
+  --edge:#3d3578;
+  --text:#f3efff;
+  --muted:#aaa2d8;
+  --violet:#8b6cf0;
+  --safranin:#ff5f8f;
+  --methylene:#4cc9f0;
+  --gold:#ffd166;
+  --good:#5ee0a0;
+  --bad:#ff6b6b;
+  --font-display:'Lilita One','Trebuchet MS',system-ui,sans-serif;
+  --font-body:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  background-color:var(--ink);
+  color:var(--text);
+  font-family:var(--font-body);
+  font-size:16px;
+  line-height:1.45;
+  padding-block:8px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.app{height:100%;max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:6px}
+h1,h2,h3{font-family:var(--font-display);font-weight:400;letter-spacing:.02em;margin:0;text-wrap:balance}
+p{margin:0}
+small{color:var(--muted)}
+button{font:inherit}
+button:focus-visible{outline:3px solid var(--methylene);outline-offset:2px}
+
+/* status */
+.hud{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-weight:800}
+.hearts{display:flex;gap:2px}
+.heart svg{display:block;fill:var(--safranin)}
+.heart.lost svg{fill:#4a4278}
+.stat{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.9rem}
+.stat b{color:var(--gold);font-size:1.05rem}
+.sp{flex:1}
+.tool{font-size:.82rem;font-weight:800;color:var(--text);background:var(--slide);border:2px solid var(--edge);border-radius:999px;padding:3px 11px;cursor:pointer}
+.tool[aria-pressed="false"]{color:var(--muted)}
+.objective{font-size:.82rem;color:var(--methylene);font-weight:600;min-height:1.2em}
+
+/* dunia */
+.stage{position:relative;flex:1;min-height:340px;border-radius:18px;overflow:hidden;border:2px solid var(--edge);background:var(--slide)}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.mm{position:absolute;right:8px;bottom:8px;width:132px;height:auto;border:2px solid var(--edge);border-radius:10px;background:var(--ink);pointer-events:none;opacity:.92}
+.banner{position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:0;background:rgba(19,15,43,.78);border:2px solid var(--edge);border-radius:14px;padding:6px 16px;opacity:0;transition:opacity .4s;pointer-events:none;text-align:center;max-width:92%}
+.banner.on{opacity:1}
+.banner b{font-family:var(--font-display);font-weight:400;font-size:1.25rem;letter-spacing:.02em}
+.banner span{font-size:.8rem;color:var(--muted)}
+.toast{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:var(--slide-2);border:2px solid var(--violet);border-radius:12px;padding:6px 14px;font-weight:800;font-size:.9rem;opacity:0;transition:opacity .3s;pointer-events:none;text-align:center;max-width:calc(100% - 170px);z-index:3}
+.toast.on{opacity:1}
+
+/* lapisan */
+.ov{position:absolute;inset:0;display:grid;place-items:center;padding:12px;background:rgba(19,15,43,.82);overflow:auto;z-index:5}
+.panel{width:100%;max-width:520px;background:var(--slide);border:2px solid var(--edge);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.kicker{font-weight:800;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--methylene)}
+.title{font-size:clamp(2.4rem,11vw,3.4rem);line-height:1}
+.title span{color:var(--safranin)}
+.sub{font-family:var(--font-display);font-size:1.3rem;color:var(--gold);letter-spacing:.04em}
+.lead{color:var(--muted)}
+.how{margin:0;padding-left:1.1rem;color:var(--muted);display:grid;gap:3px;font-size:.93rem}
+.how b{color:var(--text)}
+.btn{font-family:var(--font-display);font-size:1.15rem;letter-spacing:.03em;background:var(--safranin);color:#2a0a18;border:0;border-bottom:4px solid #c23a69;border-radius:14px;padding:12px 18px;cursor:pointer;width:100%}
+.btn:active{transform:translateY(2px);border-bottom-width:2px}
+.btn.ghost{background:var(--slide-2);color:var(--text);border-bottom-color:var(--edge)}
+.saved{color:var(--gold);font-weight:800;font-size:.92rem}
+
+/* pertarungan */
+.bhead{display:flex;align-items:center;gap:12px}
+.bimg{flex:none;width:84px;height:84px;border-radius:50%;background:radial-gradient(circle at 50% 45%,#35296f 0,#241d52 75%);border:3px solid var(--edge);display:grid;place-items:center;animation:bob 2.6s ease-in-out infinite}
+.bimg svg{width:72px;height:72px;display:block}
+.bname{font-family:var(--font-display);font-size:1.5rem;letter-spacing:.02em;line-height:1.1}
+.btopic{font-size:.78rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--methylene)}
+.pips{display:flex;gap:6px;margin-top:4px}
+.pip{width:22px;height:9px;border-radius:999px;background:var(--slide-2);border:2px solid var(--edge)}
+.pip.on{background:var(--safranin);border-color:var(--safranin)}
+.taunt{font-style:italic;color:var(--muted);font-size:.93rem}
+.qtext{font-size:1.08rem;font-weight:800;line-height:1.4}
+.opts{display:grid;gap:8px}
+.opt{font-weight:600;text-align:left;display:flex;align-items:center;gap:12px;background:var(--slide-2);color:var(--text);border:2px solid var(--edge);border-radius:14px;padding:10px 12px;cursor:pointer;width:100%;min-width:0}
+.opt:disabled{color:var(--text);cursor:default}
+.opt .badge{flex:none;width:30px;height:30px;border-radius:50%;background:var(--ink);color:var(--methylene);display:grid;place-items:center;font-family:var(--font-display);font-size:1rem}
+.opt .otext{min-width:0;overflow-wrap:anywhere}
+.opt:not(:disabled):hover{border-color:var(--violet)}
+.opt.correct{border-color:var(--good);background:rgba(94,224,160,.16)}
+.opt.correct .badge{background:var(--good);color:#06301c}
+.opt.wrong{border-color:var(--bad);background:rgba(255,107,107,.14)}
+.opt.wrong .badge{background:var(--bad);color:#3a0808}
+.opt.dim{opacity:.5}
+.pw{font-weight:800;font-size:.9rem;color:var(--text);background:var(--ink);border:2px dashed var(--edge);border-radius:12px;padding:8px;cursor:pointer;width:100%}
+.pw:disabled{opacity:.4;cursor:default}
+.fb{border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;border:2px solid var(--edge);background:var(--ink)}
+.fb.ok{border-color:var(--good)}
+.fb.no{border-color:var(--bad)}
+.fb h3{font-size:1.2rem}
+.fb.ok h3{color:var(--good)}
+.fb.no h3{color:var(--bad)}
+.fb p{font-size:.96rem}
+
+/* catatan dan hasil */
+.facts{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.facts li{background:var(--ink);border:2px solid var(--edge);border-radius:12px;padding:8px 10px;font-size:.92rem}
+.facts li small{display:block}
+.facts li b{color:var(--good)}
+.empty{color:var(--muted);font-size:.9rem}
+.nscroll{display:flex;flex-direction:column;gap:10px;max-height:56vh;overflow:auto;padding-right:2px}
+.nscroll h3{font-size:1.1rem}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:0}
+.stats div{background:var(--ink);border:2px solid var(--edge);border-radius:14px;padding:8px 12px}
+.stats dt{font-size:.78rem;color:var(--muted);font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.stats dd{margin:0;font-family:var(--font-display);font-size:1.5rem;font-variant-numeric:tabular-nums}
+
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@media (max-width:480px){.mm{width:104px}.toast{max-width:calc(100% - 130px)}}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+
+<main class="app">
+  <header class="hud">
+    <div class="hearts" id="hearts" role="img"></div>
+    <span class="stat"><b id="score">0</b> poin</span>
+    <span class="stat" id="prog"></span>
+    <span class="sp"></span>
+    <button type="button" class="tool" id="btnNotes">Catatan 0/40</button>
+    <button type="button" class="tool" id="btnSound" aria-pressed="true">Suara: nyala</button>
+    <button type="button" class="tool" id="btnMenu">Menu</button>
+  </header>
+  <p class="objective" id="objective"></p>
+
+  <div class="stage" id="stage">
+    <canvas id="cv" aria-label="Peta dunia BioMonster"></canvas>
+    <canvas id="mm" class="mm" width="150" height="115" aria-hidden="true"></canvas>
+    <div class="banner" id="banner" aria-live="polite"><b id="banName"></b><span id="banSub"></span></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <!-- MULAI -->
+    <div class="ov" id="start">
+      <div class="panel">
+        <p class="kicker">Jelajahi · Lawan · Pelajari</p>
+        <div>
+          <h1 class="title">Bio<span>Monster</span></h1>
+          <p class="sub">Dunia Terbuka</p>
+        </div>
+        <p class="lead">Jelajahi 5 wilayah, temui 30 monster yang berkeliaran, dan kalahkan mereka dengan menjawab soal biologi.</p>
+        <ul class="how">
+          <li><b>Berjalan:</b> geser jari atau mouse di dunia, atau tekan W A S D.</li>
+          <li><b>Bertarung:</b> monster mengejar jika kamu mendekat. Sentuh monster untuk mulai menjawab soal.</li>
+          <li><b>Bos</b> terbangun setelah 5 monster di wilayahnya kalah.</li>
+          <li><b>Singgasana Evolusi</b> di tengah peta terbuka setelah 4 bos kalah.</li>
+          <li><b>Herbal</b> memulihkan nyawa. <b>Kristal</b> menambah bantuan 50:50. Kemah memulihkan semua nyawa.</li>
+        </ul>
+        <p class="saved" id="savedLine" hidden></p>
+        <button type="button" class="btn" id="btnPlay">Mulai Menjelajah</button>
+        <button type="button" class="btn ghost" id="btnReset" hidden>Mulai dari awal</button>
+      </div>
+    </div>
+
+    <!-- PERTARUNGAN -->
+    <div class="ov" id="battle" hidden>
+      <div class="panel">
+        <div class="bhead">
+          <div class="bimg" id="bImg"></div>
+          <div>
+            <div class="bname" id="bName"></div>
+            <div class="btopic" id="bTopic"></div>
+            <div class="pips" id="bPips" aria-label="Sisa serangan"></div>
+          </div>
+        </div>
+        <p class="taunt" id="bTaunt"></p>
+        <p class="qtext" id="bQ"></p>
+        <div class="opts" id="bOpts"></div>
+        <button type="button" class="pw" id="bHint">50:50</button>
+        <div class="fb" id="bFb" role="status" aria-live="polite" hidden>
+          <h3 id="bFbTitle"></h3>
+          <p id="bFbBody"></p>
+          <button type="button" class="btn" id="bA">Lanjut</button>
+          <button type="button" class="btn ghost" id="bB" hidden>Mundur</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CATATAN -->
+    <div class="ov" id="notes" hidden>
+      <div class="panel">
+        <h2>Buku Catatan</h2>
+        <p class="lead" id="notesLead"></p>
+        <div class="nscroll" id="notesBody"></div>
+        <button type="button" class="btn" id="btnNotesClose">Kembali menjelajah</button>
+      </div>
+    </div>
+
+    <!-- MENANG -->
+    <div class="ov" id="win" hidden>
+      <div class="panel">
+        <h2 class="title" style="font-size:clamp(2rem,9vw,2.8rem)">Raja Evolusi tumbang!</h2>
+        <p class="lead">Kelima bos sudah kalah. Dunia BioMonster aman berkat ilmu biologimu.</p>
+        <dl class="stats">
+          <div><dt>Skor</dt><dd id="wScore">0</dd></div>
+          <div><dt>Monster kalah</dt><dd id="wKills">0</dd></div>
+          <div><dt>Catatan</dt><dd id="wNotes">0</dd></div>
+          <div><dt>Nyawa tersisa</dt><dd id="wHearts">0</dd></div>
+        </dl>
+        <button type="button" class="btn" id="btnWinClose">Lanjut menjelajah</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Gambar monster (SVG orisinal) ---------- */
+  function eye(cx, cy, r, pupil) {
+    return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#fff"/>' +
+      '<circle cx="' + (cx + r * 0.2) + '" cy="' + (cy + r * 0.15) + '" r="' + (r * 0.5) + '" fill="' + pupil + '"/>' +
+      '<circle cx="' + (cx + r * 0.35) + '" cy="' + (cy - r * 0.1) + '" r="' + (r * 0.16) + '" fill="#fff"/>';
+  }
+  function wrap(label, inner) {
+    return '<svg viewBox="0 0 200 200" role="img" aria-label="' + label + '" xmlns="http://www.w3.org/2000/svg">' + inner + '</svg>';
+  }
+
+  function svgSel() {
+    var cilia = '';
+    for (var a = 0; a < 360; a += 20) {
+      var r = a * Math.PI / 180;
+      cilia += '<line x1="' + (100 + Math.cos(r) * 70).toFixed(1) + '" y1="' + (100 + Math.sin(r) * 68).toFixed(1) +
+        '" x2="' + (100 + Math.cos(r) * 90).toFixed(1) + '" y2="' + (100 + Math.sin(r) * 88).toFixed(1) +
+        '" stroke="#b9a6ff" stroke-width="4" stroke-linecap="round"/>';
+    }
+    return wrap('Sitoplasmo, monster sel',
+      cilia +
+      '<ellipse cx="100" cy="100" rx="72" ry="70" fill="#7c5ce0" stroke="#b9a6ff" stroke-width="4"/>' +
+      '<ellipse cx="62" cy="138" rx="14" ry="7" fill="#a58cf5" transform="rotate(-20 62 138)"/>' +
+      '<ellipse cx="142" cy="132" rx="12" ry="6" fill="#a58cf5" transform="rotate(25 142 132)"/>' +
+      '<ellipse cx="60" cy="96" rx="9" ry="5" fill="#a58cf5" transform="rotate(40 60 96)"/>' +
+      '<circle cx="100" cy="86" r="32" fill="#3a2a8a"/>' +
+      '<circle cx="100" cy="86" r="23" fill="#fff"/>' +
+      '<circle cx="104" cy="88" r="12" fill="#ff5f8f"/><circle cx="106" cy="88" r="5.5" fill="#1a0b2e"/>' +
+      '<path d="M70 62 L128 76" stroke="#1a0b2e" stroke-width="7" stroke-linecap="round"/>' +
+      '<path d="M70 126 Q100 160 130 126Z" fill="#1a0b2e"/>' +
+      '<polygon points="82,127 88,139 94,128" fill="#fff"/><polygon points="106,128 112,139 118,127" fill="#fff"/>');
+  }
+
+  function svgGen() {
+    var p1 = [], p2 = [], rungs = '', cols = ['#ffd166', '#4cc9f0', '#ff5f8f', '#5ee0a0'], i = 0, y, x;
+    for (y = 64; y <= 188; y += 4) {
+      x = 34 * Math.sin((y - 64) / 13);
+      p1.push((100 + x).toFixed(1) + ',' + y);
+      p2.push((100 - x).toFixed(1) + ',' + y);
+    }
+    for (y = 70; y <= 184; y += 12) {
+      x = 34 * Math.sin((y - 64) / 13);
+      rungs += '<line x1="' + (100 + x).toFixed(1) + '" y1="' + y + '" x2="' + (100 - x).toFixed(1) + '" y2="' + y +
+        '" stroke="' + cols[i % 4] + '" stroke-width="6" stroke-linecap="round"/>';
+      i++;
+    }
+    return wrap('Genetron, monster DNA',
+      rungs +
+      '<polyline points="' + p1.join(' ') + '" fill="none" stroke="#4cc9f0" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<polyline points="' + p2.join(' ') + '" fill="none" stroke="#ff5f8f" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<circle cx="100" cy="42" r="32" fill="#2d2470" stroke="#4cc9f0" stroke-width="4"/>' +
+      eye(86, 38, 8.5, '#ff5f8f') + eye(114, 38, 8.5, '#ff5f8f') +
+      '<path d="M74 24 L94 32 M126 24 L106 32" stroke="#130f2b" stroke-width="5" stroke-linecap="round"/>' +
+      '<path d="M84 56 Q100 68 116 56Z" fill="#130f2b"/>' +
+      '<polygon points="90,57 94,64 98,57" fill="#fff"/><polygon points="102,57 106,64 110,57" fill="#fff"/>');
+  }
+
+  function svgPred() {
+    var teethTop = '', teethBot = '', x;
+    for (x = 58; x <= 134; x += 19) {
+      teethTop += '<polygon points="' + x + ',117 ' + (x + 9) + ',134 ' + (x + 18) + ',117" fill="#fff"/>';
+    }
+    for (x = 66; x <= 126; x += 19) {
+      teethBot += '<polygon points="' + x + ',163 ' + (x + 9) + ',148 ' + (x + 18) + ',163" fill="#fff"/>';
+    }
+    return wrap('Predatoroks, monster pemangsa',
+      '<path d="M50 58 L36 12 L82 40Z" fill="#c4521a"/><path d="M150 58 L164 12 L118 40Z" fill="#c4521a"/>' +
+      '<ellipse cx="100" cy="94" rx="72" ry="62" fill="#ff8c42"/>' +
+      '<ellipse cx="72" cy="80" rx="17" ry="14" fill="#ffe8a3"/><ellipse cx="128" cy="80" rx="17" ry="14" fill="#ffe8a3"/>' +
+      '<ellipse cx="72" cy="81" rx="4.5" ry="11" fill="#2a0f1f"/><ellipse cx="128" cy="81" rx="4.5" ry="11" fill="#2a0f1f"/>' +
+      '<path d="M50 62 L88 74 M150 62 L112 74" stroke="#2a0f1f" stroke-width="7" stroke-linecap="round"/>' +
+      '<path d="M44 114 Q100 196 156 114 Q100 130 44 114Z" fill="#2a0f1f"/>' +
+      teethTop + teethBot +
+      '<circle cx="92" cy="104" r="3" fill="#c4521a"/><circle cx="108" cy="104" r="3" fill="#c4521a"/>');
+  }
+
+  function svgHydra() {
+    var heads = [{ x: 42, y: 74, c: '#ff8fa3' }, { x: 100, y: 46, c: '#ff4d6d' }, { x: 158, y: 74, c: '#ffb703' }];
+    var necks = '', hd = '';
+    heads.forEach(function (h) {
+      necks += '<path d="M100 172 C100 132 ' + h.x + ' 132 ' + h.x + ' ' + (h.y + 16) + '" fill="none" stroke="' + h.c + '" stroke-width="18" stroke-linecap="round"/>';
+      hd += '<circle cx="' + h.x + '" cy="' + h.y + '" r="23" fill="' + h.c + '" stroke="#2a0f1f" stroke-width="3"/>' +
+        eye(h.x, h.y - 5, 8, '#2a0f1f') +
+        '<path d="M' + (h.x - 14) + ' ' + (h.y - 18) + ' L' + (h.x + 4) + ' ' + (h.y - 12) + '" stroke="#2a0f1f" stroke-width="4" stroke-linecap="round"/>' +
+        '<ellipse cx="' + h.x + '" cy="' + (h.y + 12) + '" rx="10" ry="6" fill="#2a0f1f"/>' +
+        '<polygon points="' + (h.x - 6) + ',' + (h.y + 8) + ' ' + (h.x - 3) + ',' + (h.y + 15) + ' ' + h.x + ',' + (h.y + 8) + '" fill="#fff"/>' +
+        '<polygon points="' + h.x + ',' + (h.y + 8) + ' ' + (h.x + 3) + ',' + (h.y + 15) + ' ' + (h.x + 6) + ',' + (h.y + 8) + '" fill="#fff"/>';
+    });
+    return wrap('Hydra Organa, monster tiga kepala',
+      '<ellipse cx="100" cy="178" rx="60" ry="20" fill="#7a1f3d"/>' +
+      '<circle cx="76" cy="178" r="5" fill="#b8325a"/><circle cx="124" cy="180" r="5" fill="#b8325a"/><circle cx="100" cy="184" r="4" fill="#b8325a"/>' +
+      necks + hd);
+  }
+
+  function svgRaja() {
+    return wrap('Raja Evolusi, monster bermahkota',
+      '<path d="M34 118 Q18 80 40 62 Q44 92 56 104Z" fill="#2f8a57"/><path d="M166 118 Q182 80 160 62 Q156 92 144 104Z" fill="#2f8a57"/>' +
+      '<circle cx="100" cy="120" r="68" fill="#3fae6a" stroke="#2f8a57" stroke-width="4"/>' +
+      '<path d="M62 70 L70 32 L86 54 L100 24 L114 54 L130 32 L138 70Z" fill="#ffd166" stroke="#c9961c" stroke-width="3" stroke-linejoin="round"/>' +
+      '<circle cx="100" cy="46" r="5" fill="#ff5f8f"/>' +
+      eye(70, 112, 15, '#1a0b2e') + eye(130, 112, 15, '#1a0b2e') + eye(100, 90, 9, '#ff5f8f') +
+      '<path d="M50 94 L86 106 M150 94 L114 106" stroke="#1a0b2e" stroke-width="6" stroke-linecap="round"/>' +
+      '<path d="M58 144 Q100 192 142 144Z" fill="#1a0b2e"/>' +
+      '<polygon points="66,146 74,160 82,148" fill="#fff"/><polygon points="90,150 98,166 106,152" fill="#fff"/><polygon points="116,150 124,160 132,146" fill="#fff"/>');
+  }
+
+  /* ---------- Data monster dan soal (8 soal per monster, 5 dipakai tiap pertarungan) ---------- */
+  var MONSTERS = [
+    {
+      name: 'Sitoplasmo', topic: 'Biologi Sel', svg: svgSel, glow: 'rgba(139,108,240,.5)',
+      taunt: 'Aku menelan setiap sel yang tidak tahu fungsi organelnya!',
+      qs: [
+        { q: 'Organel mana yang menghasilkan sebagian besar ATP melalui respirasi sel?', ok: 'Mitokondria', bad: ['Ribosom', 'Lisosom', 'Badan Golgi'], why: 'Mitokondria disebut pembangkit tenaga sel karena menghasilkan ATP dari respirasi sel.' },
+        { q: 'Struktur manakah yang dimiliki sel tumbuhan tetapi tidak dimiliki sel hewan?', ok: 'Dinding sel', bad: ['Mitokondria', 'Inti sel', 'Ribosom'], why: 'Dinding sel dari selulosa memberi bentuk tetap pada sel tumbuhan. Sel hewan hanya dibatasi membran plasma.' },
+        { q: 'Di organel manakah protein disintesis?', ok: 'Ribosom', bad: ['Lisosom', 'Vakuola', 'Sentriol'], why: 'Ribosom menerjemahkan mRNA menjadi rantai asam amino. Ribosom ada di sitoplasma dan menempel pada retikulum endoplasma kasar.' },
+        { q: 'Perpindahan molekul air melalui membran semipermeabel dari larutan yang lebih encer ke yang lebih pekat disebut...', ok: 'Osmosis', bad: ['Transpor aktif', 'Endositosis', 'Fotolisis'], why: 'Osmosis adalah difusi air melalui membran semipermeabel, dari konsentrasi zat terlarut rendah ke tinggi.' },
+        { q: 'Organel yang berisi enzim pencernaan untuk menghancurkan zat yang tidak berguna adalah...', ok: 'Lisosom', bad: ['Ribosom', 'Nukleus', 'Plastida'], why: 'Lisosom berisi enzim hidrolitik yang mencerna makanan, organel rusak, dan kuman.' },
+        { q: 'Fotosintesis pada sel tumbuhan berlangsung di...', ok: 'Kloroplas', bad: ['Mitokondria', 'Badan Golgi', 'Vakuola'], why: 'Kloroplas mengandung klorofil yang menangkap cahaya matahari untuk membuat glukosa.' },
+        { q: 'Perbedaan utama sel prokariotik dan eukariotik terletak pada...', ok: 'Adanya membran inti', bad: ['Adanya membran plasma', 'Adanya ribosom', 'Adanya sitoplasma'], why: 'Sel prokariotik, misalnya bakteri, tidak memiliki membran inti. Materi genetiknya berada bebas di sitoplasma.' },
+        { q: 'Pembelahan sel yang menghasilkan dua sel anak identik dengan jumlah kromosom sama disebut...', ok: 'Mitosis', bad: ['Meiosis', 'Fertilisasi', 'Osmosis'], why: 'Mitosis menghasilkan dua sel anak yang identik. Proses ini terjadi untuk pertumbuhan dan perbaikan jaringan.' }
+      ]
+    },
+    {
+      name: 'Genetron', topic: 'Genetika', svg: svgGen, glow: 'rgba(76,201,240,.5)',
+      taunt: 'Kodemu akan kuacak-acak menjadi mutasi!',
+      qs: [
+        { q: 'Dalam molekul DNA, basa adenin selalu berpasangan dengan...', ok: 'Timin', bad: ['Sitosin', 'Guanin', 'Urasil'], why: 'Pasangannya A–T dan G–C. Urasil hanya ada di RNA.' },
+        { q: 'Tanaman Aa disilangkan dengan Aa (A dominan penuh terhadap a). Perbandingan fenotip keturunannya adalah...', ok: '3 : 1', bad: ['1 : 1', '1 : 2 : 1', '9 : 3 : 3 : 1'], why: 'Genotipe keturunan AA : Aa : aa = 1 : 2 : 1. Karena A dominan penuh, fenotipnya 3 dominan : 1 resesif.' },
+        { q: 'Susunan kromosom seks perempuan normal adalah...', ok: 'XX', bad: ['XY', 'XO', 'YY'], why: 'Perempuan normal memiliki dua kromosom X. Laki-laki normal memiliki X dan Y.' },
+        { q: 'Proses pembentukan mRNA dengan cetakan DNA disebut...', ok: 'Transkripsi', bad: ['Translasi', 'Replikasi', 'Fertilisasi'], why: 'Transkripsi terjadi di inti sel. Translasi adalah penerjemahan mRNA menjadi protein di ribosom.' },
+        { q: 'Percobaan persilangan kacang ercis membuat ilmuwan ini dijuluki Bapak Genetika. Siapakah dia?', ok: 'Gregor Mendel', bad: ['Charles Darwin', 'Watson dan Crick', 'Louis Pasteur'], why: 'Mendel mengamati pewarisan sifat pada kacang ercis dan merumuskan hukum pewarisan sifat.' },
+        { q: 'Perubahan materi genetik yang terjadi secara tiba-tiba disebut...', ok: 'Mutasi', bad: ['Adaptasi', 'Seleksi', 'Migrasi'], why: 'Mutasi mengubah urutan DNA. Dampaknya bisa merugikan, netral, atau kadang menguntungkan.' },
+        { q: 'Golongan darah AB memiliki genotipe...', ok: 'IAIB', bad: ['IAIA', 'IBi', 'ii'], why: 'Golongan AB memiliki alel IA dan IB yang sama-sama muncul (kodominan). IAIA golongan A, IBi golongan B, ii golongan O.' },
+        { q: 'Molekul yang membawa kode genetik dari inti sel ke ribosom adalah...', ok: 'mRNA', bad: ['tRNA', 'rRNA', 'DNA polimerase'], why: 'mRNA membawa kodon dari DNA ke ribosom. tRNA membawa asam amino ke ribosom.' }
+      ]
+    },
+    {
+      name: 'Predatoroks', topic: 'Ekologi', svg: svgPred, glow: 'rgba(255,140,66,.5)',
+      taunt: 'Aku di puncak rantai makanan. Kamu cuma camilan!',
+      qs: [
+        { q: 'Dalam rantai makanan, rumput berperan sebagai...', ok: 'Produsen', bad: ['Konsumen tingkat I', 'Konsumen tingkat II', 'Dekomposer'], why: 'Rumput membuat makanan sendiri lewat fotosintesis, jadi ia produsen.' },
+        { q: 'Hubungan lebah yang mengisap nektar sekaligus membantu penyerbukan bunga disebut...', ok: 'Mutualisme', bad: ['Parasitisme', 'Komensalisme', 'Predasi'], why: 'Kedua pihak diuntungkan: lebah mendapat nektar, bunga mendapat penyerbukan.' },
+        { q: 'Jamur dan bakteri pembusuk berperan sebagai...', ok: 'Dekomposer', bad: ['Produsen', 'Konsumen puncak', 'Herbivora'], why: 'Dekomposer menguraikan sisa makhluk hidup menjadi unsur hara yang dipakai lagi oleh produsen.' },
+        { q: 'Menurut kaidah umum, energi yang berpindah dari satu tingkat trofik ke tingkat berikutnya kira-kira sebesar...', ok: '10%', bad: ['50%', '90%', '100%'], why: 'Sekitar 90% energi hilang sebagai panas dan untuk aktivitas hidup. Karena itu rantai makanan jarang lebih dari 4–5 tingkat.' },
+        { q: 'Kumpulan populasi berbagai spesies yang hidup di suatu tempat disebut...', ok: 'Komunitas', bad: ['Populasi', 'Individu', 'Biosfer'], why: 'Populasi adalah kumpulan individu satu spesies. Gabungan beberapa populasi di satu area membentuk komunitas.' },
+        { q: 'Cahaya matahari, suhu, dan air termasuk komponen...', ok: 'Abiotik', bad: ['Biotik', 'Produsen', 'Konsumen'], why: 'Komponen abiotik adalah faktor tak hidup di ekosistem. Komponen biotik adalah makhluk hidupnya.' },
+        { q: 'Cacing pita yang hidup di usus manusia dan mengambil makanan inangnya adalah contoh...', ok: 'Parasitisme', bad: ['Mutualisme', 'Komensalisme', 'Netralisme'], why: 'Pada parasitisme, parasit diuntungkan dan inangnya dirugikan.' },
+        { q: 'Gas rumah kaca yang paling banyak dilepas dari pembakaran bahan bakar fosil adalah...', ok: 'Karbon dioksida', bad: ['Oksigen', 'Nitrogen', 'Argon'], why: 'Karbon dioksida menahan panas di atmosfer dan menjadi penyebab utama pemanasan global.' }
+      ]
+    },
+    {
+      name: 'Hydra Organa', topic: 'Sistem Tubuh', svg: svgHydra, glow: 'rgba(255,77,109,.5)',
+      taunt: 'Kalahkan satu kepalaku, tumbuh soal baru!',
+      qs: [
+        { q: 'Pertukaran oksigen dan karbon dioksida di paru-paru terjadi di...', ok: 'Alveolus', bad: ['Bronkus', 'Trakea', 'Laring'], why: 'Dinding alveolus sangat tipis dan dikelilingi kapiler, sehingga gas mudah berdifusi.' },
+        { q: 'Bagian darah yang mengangkut oksigen karena mengandung hemoglobin adalah...', ok: 'Eritrosit', bad: ['Leukosit', 'Trombosit', 'Plasma darah'], why: 'Eritrosit (sel darah merah) mengikat oksigen dengan hemoglobin. Leukosit melawan penyakit, trombosit membantu pembekuan.' },
+        { q: 'Penyerapan sari makanan terutama terjadi di...', ok: 'Usus halus', bad: ['Lambung', 'Usus besar', 'Kerongkongan'], why: 'Dinding usus halus berlipat dan berjonjot (vili), sehingga permukaan penyerapannya luas.' },
+        { q: 'Unit struktural dan fungsional ginjal yang menyaring darah disebut...', ok: 'Nefron', bad: ['Neuron', 'Alveolus', 'Vili'], why: 'Satu ginjal memiliki sekitar satu juta nefron yang menyaring darah dan membentuk urine.' },
+        { q: 'Bagian otak yang mengatur keseimbangan dan koordinasi gerak adalah...', ok: 'Otak kecil', bad: ['Otak besar', 'Sumsum lanjutan', 'Hipotalamus'], why: 'Otak kecil (serebelum) mengoordinasi gerakan dan menjaga keseimbangan tubuh.' },
+        { q: 'Hormon insulin yang menurunkan kadar gula darah dihasilkan oleh...', ok: 'Pankreas', bad: ['Hati', 'Ginjal', 'Kelenjar tiroid'], why: 'Sel beta pada pulau Langerhans di pankreas menghasilkan insulin. Kekurangan insulin dapat menyebabkan diabetes melitus.' },
+        { q: 'Enzim amilase dalam air liur mulai mencerna...', ok: 'Karbohidrat', bad: ['Protein', 'Lemak', 'Vitamin'], why: 'Amilase mengubah amilum menjadi maltosa sejak makanan masih di dalam mulut.' },
+        { q: 'Ruang jantung yang memompa darah kaya oksigen ke seluruh tubuh adalah...', ok: 'Bilik kiri', bad: ['Bilik kanan', 'Serambi kanan', 'Serambi kiri'], why: 'Bilik kiri berdinding paling tebal karena memompa darah ke seluruh tubuh lewat aorta.' }
+      ]
+    },
+    {
+      name: 'Raja Evolusi', topic: 'Evolusi', svg: svgRaja, glow: 'rgba(255,209,102,.55)', boss: true,
+      taunt: 'Akulah mahkota evolusi. Buktikan kamu layak bertahan!',
+      qs: [
+        { q: 'Tata nama ilmiah dengan dua kata (binomial) dipopulerkan oleh...', ok: 'Carolus Linnaeus', bad: ['Charles Darwin', 'Gregor Mendel', 'Louis Pasteur'], why: 'Linnaeus memberi nama ilmiah dari genus dan spesies, misalnya Homo sapiens.' },
+        { q: 'Teori evolusi melalui seleksi alam dikemukakan oleh...', ok: 'Charles Darwin', bad: ['Jean-Baptiste Lamarck', 'Gregor Mendel', 'Carolus Linnaeus'], why: 'Darwin menyatakan individu yang paling sesuai dengan lingkungannya lebih mungkin bertahan dan berkembang biak.' },
+        { q: 'Takson paling rendah dan paling spesifik dalam klasifikasi makhluk hidup adalah...', ok: 'Spesies', bad: ['Genus', 'Famili', 'Kingdom'], why: 'Urutannya dari luas ke sempit: Kingdom, Filum, Kelas, Ordo, Famili, Genus, Spesies.' },
+        { q: 'Sayap burung dan sirip depan paus punya struktur tulang yang mirip karena berasal dari leluhur yang sama. Organ seperti ini disebut...', ok: 'Homolog', bad: ['Analog', 'Vestigial', 'Fosil'], why: 'Organ homolog asal-usulnya sama tetapi fungsinya bisa berbeda. Organ analog fungsinya sama tetapi asal-usulnya berbeda.' },
+        { q: 'Organ yang mengecil dan tidak lagi berfungsi optimal, seperti tulang ekor pada manusia, disebut organ...', ok: 'Vestigial', bad: ['Homolog', 'Analog', 'Reproduktif'], why: 'Organ vestigial adalah sisa organ yang dulu berfungsi pada leluhur.' },
+        { q: 'Sisa makhluk hidup purba yang terawetkan dalam batuan disebut...', ok: 'Fosil', bad: ['Spora', 'Embrio', 'Kista'], why: 'Fosil memperlihatkan perubahan makhluk hidup dari masa ke masa dan menjadi salah satu bukti evolusi.' },
+        { q: 'Kelompok hewan bertulang belakang yang berbulu dan berkembang biak dengan bertelur adalah...', ok: 'Aves', bad: ['Mamalia', 'Reptilia', 'Amfibia'], why: 'Aves (burung) berbulu, bertelur, dan berdarah panas.' },
+        { q: 'Pada nama ilmiah Panthera tigris, kata Panthera menunjukkan...', ok: 'Genus', bad: ['Spesies', 'Famili', 'Ordo'], why: 'Dalam nama binomial, kata pertama adalah genus (huruf awal kapital) dan kata kedua adalah penunjuk spesies.' }
+      ]
+    }
+  ];
+
+
+
+  /* ---------- Dunia dan wilayah ---------- */
+  var MAXH = 5, W = 2600, H = 2000, SPEED = 190;
+  var CAMP = { x: 1300, y: 1660 };
+  var ARENA = { x: 1300, y: 880, r: 320 };
+  var ZN = [
+    { name: 'Rawa Sitoplasma', c: { x: 560, y: 480 }, hsl: [265, 40, 28], minions: ['Amuba Liar', 'Lisosom Rakus', 'Ribosom Usil', 'Vakuola Gendut', 'Mito Murka'] },
+    { name: 'Lembah Kristal DNA', c: { x: 2040, y: 480 }, hsl: [200, 55, 24], minions: ['Basa Nakal', 'Kromo Kusut', 'Gen Resesif', 'Alel Kembar', 'Kodon Licik'] },
+    { name: 'Hutan Rantai Makanan', c: { x: 560, y: 1450 }, hsl: [140, 38, 25], minions: ['Belalang Buas', 'Jamur Rakus', 'Ulat Gelap', 'Rumput Duri', 'Elang Bayangan'] },
+    { name: 'Gua Organa', c: { x: 2040, y: 1450 }, hsl: [335, 38, 27], minions: ['Darah Beringas', 'Alveolus Sesak', 'Neuron Kilat', 'Nefron Kesal', 'Vili Licin'] },
+    { name: 'Dataran Fosil', c: { x: 1300, y: 880 }, hsl: [38, 45, 32], minions: ['Fosil Hidup', 'Trilobit Garang', 'Ammonit Putar', 'Sirip Purba', 'Tulang Ekor'] }
+  ];
+  var TAUNTS = ['Jawab dengan benar atau minggir!', 'Sini, buktikan ilmumu!', 'Aku tidak akan mudah kalah!', 'Hanya jawaban benar yang bisa melukaiku!', 'Kamu berani lewat wilayahku?'];
+
+  function el(id) { return document.getElementById(id); }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function shuffle(a) {
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function hash(a, b) {
+    var h = Math.imul(a, 374761393) ^ Math.imul(b, 668265263);
+    h = Math.imul(h ^ h >>> 13, 1274126177);
+    return ((h ^ h >>> 16) >>> 0) / 4294967296;
+  }
+  function zoneAt(x, y) {
+    if (Math.hypot(x - CAMP.x, y - CAMP.y) < 150) return -1;
+    if (Math.hypot(x - ARENA.x, y - ARENA.y) < 430) return 4;
+    var best = 0, bd = 1e9;
+    for (var i = 0; i < 4; i++) {
+      var d = Math.hypot(x - ZN[i].c.x, y - ZN[i].c.y);
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+  }
+
+  /* ---------- Soal ---------- */
+  var allQ = {};
+  MONSTERS.forEach(function (M, zi) { M.qs.forEach(function (q) { allQ[q.q] = { zi: zi, q: q }; }); });
+  var TOTAL_Q = Object.keys(allQ).length;
+  var deck = [[], [], [], [], []];
+  function drawQ(zi) {
+    if (!deck[zi].length) deck[zi] = shuffle(MONSTERS[zi].qs);
+    return deck[zi].pop();
+  }
+
+  /* ---------- Suara ---------- */
+  var muted = load('biomonster-muted') === '1';
+  var AC = null;
+  function tone(freq, dur, type, vol, delay) {
+    if (muted) return;
+    try {
+      if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+      if (AC.state === 'suspended') AC.resume();
+      var o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime + (delay || 0);
+      o.type = type || 'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol || 0.15, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(AC.destination);
+      o.start(t); o.stop(t + dur + 0.03);
+    } catch (e) {}
+  }
+  var SFX = {
+    tap: function () { tone(520, 0.06, 'triangle', 0.1); },
+    alert: function () { tone(300, 0.08, 'square', 0.08); tone(420, 0.1, 'square', 0.08, 0.07); },
+    ok: function () { tone(660, 0.12, 'triangle', 0.18); tone(880, 0.2, 'triangle', 0.18, 0.1); },
+    no: function () { tone(190, 0.25, 'sawtooth', 0.12); tone(120, 0.35, 'sawtooth', 0.12, 0.14); },
+    defeat: function () { tone(523, 0.14, 'triangle', 0.18); tone(659, 0.14, 'triangle', 0.18, 0.12); tone(784, 0.14, 'triangle', 0.18, 0.24); tone(1047, 0.4, 'triangle', 0.18, 0.36); },
+    lose: function () { tone(330, 0.25, 'sawtooth', 0.12); tone(247, 0.25, 'sawtooth', 0.12, 0.22); tone(165, 0.6, 'sawtooth', 0.12, 0.44); },
+    pick: function () { tone(740, 0.08, 'sine', 0.14); tone(990, 0.14, 'sine', 0.14, 0.07); }
+  };
+
+  /* ---------- Gambar monster sebagai sprite kanvas ---------- */
+  var sprites = MONSTERS.map(function (m) {
+    var img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.svg().replace('<svg ', '<svg width="200" height="200" '));
+    return img;
+  });
+
+  /* ---------- Menyebar monster dan benda (letak tetap berkat seed) ---------- */
+  var R = rng(20261112);
+  var monsters = [], items = [];
+  function okSpot(x, y, zi, placed) {
+    if (x < 90 || y < 90 || x > W - 90 || y > H - 90) return false;
+    if (zoneAt(x, y) !== zi) return false;
+    if (Math.hypot(x - CAMP.x, y - CAMP.y) < 260) return false;
+    if (zi !== 4 && Math.hypot(x - ARENA.x, y - ARENA.y) < ARENA.r + 70) return false;
+    if (Math.hypot(x - ZN[zi].c.x, y - ZN[zi].c.y) < 100) return false;
+    for (var i = 0; i < placed.length; i++) if (Math.hypot(x - placed[i].x, y - placed[i].y) < 115) return false;
+    return true;
+  }
+  function spot(zi, minR, maxR, placed) {
+    var x = 0, y = 0, tries = 0;
+    do {
+      var a = R() * Math.PI * 2, r = minR + R() * (maxR - minR);
+      x = ZN[zi].c.x + Math.cos(a) * r; y = ZN[zi].c.y + Math.sin(a) * r; tries++;
+    } while (tries < 80 && !okSpot(x, y, zi, placed));
+    placed.push({ x: x, y: y });
+    return { x: x, y: y };
+  }
+  ZN.forEach(function (z, zi) {
+    var placed = [], minR = zi === 4 ? 100 : 130, maxR = zi === 4 ? 230 : 340, k, p;
+    for (k = 0; k < 5; k++) {
+      p = spot(zi, minR, maxR, placed);
+      monsters.push({ id: 'm' + zi + '_' + k, zi: zi, boss: false, name: z.minions[k], x: p.x, y: p.y, hx: p.x, hy: p.y, r: 22, speed: 82, aggro: 190, leash: 220, wander: 90, need: 1, got: 0, dead: false, awake: true, flip: R() < 0.5, t: R() * 6, tx: p.x, ty: p.y, wt: R() * 2, alert: false });
+    }
+    monsters.push({ id: 'b' + zi, zi: zi, boss: true, name: MONSTERS[zi].name, x: z.c.x, y: z.c.y, hx: z.c.x, hy: z.c.y, r: 36, speed: 60, aggro: 230, leash: 110, wander: 24, need: 3, got: 0, dead: false, awake: false, flip: false, t: R() * 6, tx: z.c.x, ty: z.c.y, wt: 1, alert: false });
+    for (k = 0; k < 3; k++) {
+      p = spot(zi, minR, maxR, placed);
+      items.push({ id: 'i' + zi + '_' + k, kind: k < 2 ? 'herb' : 'crystal', x: p.x, y: p.y, taken: false, t: R() * 6 });
+    }
+  });
+
+  /* ---------- Latar dunia (digambar sekali) ---------- */
+  var PATHS = [[CAMP, ZN[0].c], [CAMP, ZN[1].c], [CAMP, ZN[2].c], [CAMP, ZN[3].c], [CAMP, { x: ARENA.x, y: ARENA.y + ARENA.r }]];
+  function distSeg(px, py, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var t = clamp(((px - a.x) * dx + (py - a.y) * dy) / (dx * dx + dy * dy), 0, 1);
+    return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
+  }
+  function onPath(x, y) {
+    for (var i = 0; i < PATHS.length; i++) if (distSeg(x, y, PATHS[i][0], PATHS[i][1]) < 38) return true;
+    return false;
+  }
+  function decor(g, zi, x, y, r1, r2) {
+    var i;
+    if (zi === 0) {
+      if (r1 < 0.4) { g.strokeStyle = 'rgba(200,180,255,.45)'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 4 + r2 * 8, 0, 6.3); g.stroke(); }
+      else if (r1 < 0.75) { g.fillStyle = '#d56bd0'; g.beginPath(); g.ellipse(x, y - 6, 9, 6, 0, Math.PI, 0); g.fill(); g.fillStyle = '#e9dcff'; g.fillRect(x - 2, y - 6, 4, 9); }
+      else { g.fillStyle = 'rgba(120,90,220,.5)'; g.beginPath(); g.ellipse(x, y, 14 + r2 * 10, 8, 0, 0, 6.3); g.fill(); }
+    } else if (zi === 1) {
+      g.fillStyle = r1 < 0.6 ? '#6fe3ff' : '#a58cf5';
+      g.beginPath(); g.moveTo(x, y - 14 - r2 * 8); g.lineTo(x + 7, y); g.lineTo(x, y + 8); g.lineTo(x - 7, y); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(x - 1, y - 10, 2, 6);
+    } else if (zi === 2) {
+      if (r1 < 0.45) {
+        g.fillStyle = '#5a3a24'; g.fillRect(x - 3, y - 4, 6, 12);
+        g.fillStyle = '#2f8a57'; g.beginPath(); g.arc(x, y - 14, 13, 0, 6.3); g.fill();
+        g.fillStyle = '#3fae6a'; g.beginPath(); g.arc(x - 5, y - 10, 9, 0, 6.3); g.fill();
+      } else if (r1 < 0.8) {
+        g.fillStyle = ['#ffd166', '#ff8fa3', '#fff'][Math.floor(r2 * 3) % 3]; g.beginPath(); g.arc(x, y, 4, 0, 6.3); g.fill();
+        g.fillStyle = '#2f8a57'; g.fillRect(x - 1, y + 3, 2, 6);
+      } else {
+        g.strokeStyle = '#4fbf7e'; g.lineWidth = 2;
+        for (i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(x + i * 4, y + 6); g.lineTo(x + i * 6, y - 6); g.stroke(); }
+      }
+    } else if (zi === 3) {
+      if (r1 < 0.6) {
+        g.fillStyle = 'rgba(255,110,140,.55)'; g.beginPath(); g.arc(x, y, 8 + r2 * 6, 0, 6.3); g.fill();
+        g.fillStyle = '#7a1f3d'; g.beginPath(); g.arc(x, y, 3, 0, 6.3); g.fill();
+      } else {
+        g.strokeStyle = 'rgba(255,90,120,.4)'; g.lineWidth = 3; g.beginPath(); g.moveTo(x - 16, y); g.quadraticCurveTo(x, y - 14 * (r2 + 0.3), x + 16, y); g.stroke();
+      }
+    } else if (zi === 4) {
+      if (r1 < 0.45) { g.fillStyle = '#6b5a3a'; g.beginPath(); g.ellipse(x, y, 10 + r2 * 8, 7, 0, 0, 6.3); g.fill(); }
+      else if (r1 < 0.75) {
+        g.strokeStyle = '#efe3c2'; g.lineWidth = 3; g.lineCap = 'round'; g.beginPath(); g.moveTo(x - 9, y); g.lineTo(x + 9, y); g.stroke();
+        g.fillStyle = '#efe3c2'; g.beginPath(); g.arc(x - 10, y - 2, 3, 0, 6.3); g.arc(x - 10, y + 2, 3, 0, 6.3); g.arc(x + 10, y - 2, 3, 0, 6.3); g.arc(x + 10, y + 2, 3, 0, 6.3); g.fill();
+      } else { g.strokeStyle = '#caa968'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 9, 0, 4.7); g.stroke(); g.beginPath(); g.arc(x, y, 4, 0, 4.7); g.stroke(); }
+    }
+  }
+  function buildWorld() {
+    var wc = document.createElement('canvas');
+    wc.width = W; wc.height = H;
+    var g = wc.getContext('2d'), T = 40, cx, cy, i;
+    for (cy = 0; cy < H / T; cy++) {
+      for (cx = 0; cx < W / T; cx++) {
+        var z = zoneAt(cx * T + T / 2, cy * T + T / 2), hsl = z < 0 ? [70, 24, 34] : ZN[z].hsl;
+        g.fillStyle = 'hsl(' + hsl[0] + ',' + hsl[1] + '%,' + (hsl[2] + (hash(cx, cy) - 0.5) * 7).toFixed(1) + '%)';
+        g.fillRect(cx * T, cy * T, T + 1, T + 1);
+      }
+    }
+    g.lineCap = 'round'; g.strokeStyle = 'rgba(235,210,150,.24)'; g.lineWidth = 46;
+    PATHS.forEach(function (p) { g.beginPath(); g.moveTo(p[0].x, p[0].y); g.lineTo(p[1].x, p[1].y); g.stroke(); });
+    g.fillStyle = 'rgba(235,210,150,.22)'; g.beginPath(); g.arc(CAMP.x, CAMP.y, 130, 0, 6.3); g.fill();
+    g.fillStyle = 'rgba(255,214,120,.10)'; g.beginPath(); g.arc(ARENA.x, ARENA.y, ARENA.r, 0, 6.3); g.fill();
+    g.setLineDash([14, 12]); g.strokeStyle = 'rgba(255,214,120,.45)'; g.lineWidth = 4;
+    g.beginPath(); g.arc(ARENA.x, ARENA.y, ARENA.r, 0, 6.3); g.stroke(); g.setLineDash([]);
+    for (cy = 0; cy < H / T; cy++) {
+      for (cx = 0; cx < W / T; cx++) {
+        var r1 = hash(cx + 91, cy + 17), r2 = hash(cx + 7, cy + 133);
+        if (r1 > 0.2) continue;
+        var x = cx * T + 6 + r2 * (T - 12), y = cy * T + 6 + hash(cx + 3, cy + 5) * (T - 12), zi = zoneAt(x, y);
+        if (zi < 0 || onPath(x, y)) continue;
+        if (Math.hypot(x - ARENA.x, y - ARENA.y) < ARENA.r + 6 && Math.hypot(x - ARENA.x, y - ARENA.y) > ARENA.r - 6) continue;
+        decor(g, zi, x, y, r1 * 5, r2);
+      }
+    }
+    g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 60; g.strokeRect(0, 0, W, H);
+    return wc;
+  }
+  var world = buildWorld();
+  var mmBase = document.createElement('canvas');
+  mmBase.width = 150; mmBase.height = 115;
+  mmBase.getContext('2d').drawImage(world, 0, 0, 150, 115);
+
+  /* ---------- Status permainan ---------- */
+  var P = { x: CAMP.x, y: CAMP.y - 70, r: 13, face: 1, immune: 0, moving: false, t: 0 };
+  var G = { score: 0, hearts: MAXH, hints: 2, streak: 0, notes: {}, arenaOpen: false, kills: 0 };
+  var ui = 'start', zoneNow = -2, B = null, T = 0;
+  var keys = {}, joy = { on: false, id: null, ax: 0, ay: 0, vx: 0, vy: 0, sx: 0, sy: 0 };
+  var parts = [], floats = [];
+  var VW = 300, VH = 300, VS = 1, DPR = 1;
+  var KEY = 'biomonster-world-v1';
+
+  function bossesDone() { var n = 0; monsters.forEach(function (m) { if (m.boss && m.zi < 4 && m.dead) n++; }); return n; }
+  function updateWorldState() {
+    ZN.forEach(function (z, zi) {
+      var left = 0, boss = null;
+      monsters.forEach(function (m) { if (m.zi !== zi) return; if (m.boss) boss = m; else if (!m.dead) left++; });
+      boss.awake = left === 0;
+      boss.sealLeft = left;
+    });
+    G.arenaOpen = bossesDone() >= 4;
+  }
+  function killCount() { var n = 0; monsters.forEach(function (m) { if (m.dead) n++; }); return n; }
+  function noteCount() { return Object.keys(G.notes).length; }
+
+  function save() {
+    var dead = [], taken = [];
+    monsters.forEach(function (m) { if (m.dead) dead.push(m.id); });
+    items.forEach(function (it) { if (it.taken) taken.push(it.id); });
+    store(KEY, JSON.stringify({ dead: dead, taken: taken, score: G.score, hearts: G.hearts, hints: G.hints, notes: Object.keys(G.notes), x: Math.round(P.x), y: Math.round(P.y) }));
+  }
+  function loadSave() {
+    try { var s = JSON.parse(load(KEY) || 'null'); return s && s.dead ? s : null; } catch (e) { return null; }
+  }
+  function applySave(s) {
+    var d = {}, t = {};
+    s.dead.forEach(function (id) { d[id] = 1; });
+    (s.taken || []).forEach(function (id) { t[id] = 1; });
+    monsters.forEach(function (m) { m.dead = !!d[m.id]; m.got = 0; });
+    items.forEach(function (it) { it.taken = !!t[it.id]; });
+    G.score = s.score | 0; G.hearts = clamp(s.hearts | 0, 1, MAXH); G.hints = Math.max(0, s.hints | 0);
+    G.notes = {};
+    (s.notes || []).forEach(function (q) { if (allQ[q]) G.notes[q] = 1; });
+    G.kills = killCount();
+    P.x = clamp(s.x || CAMP.x, 30, W - 30); P.y = clamp(s.y || CAMP.y - 70, 30, H - 30);
+  }
+  function resetGame() {
+    monsters.forEach(function (m) { m.dead = false; m.got = 0; m.x = m.hx; m.y = m.hy; });
+    items.forEach(function (it) { it.taken = false; });
+    G.score = 0; G.hearts = MAXH; G.hints = 2; G.streak = 0; G.notes = {}; G.kills = 0;
+    P.x = CAMP.x; P.y = CAMP.y - 70; P.immune = 0;
+    store(KEY, '');
+  }
+
+  /* ---------- Tampilan atas ---------- */
+  var HEART = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+  function renderHUD() {
+    var h = '', i;
+    for (i = 0; i < MAXH; i++) h += '<span class="heart' + (i < G.hearts ? '' : ' lost') + '">' + HEART + '</span>';
+    el('hearts').innerHTML = h;
+    el('hearts').setAttribute('aria-label', 'Nyawa ' + G.hearts + ' dari ' + MAXH);
+    el('score').textContent = G.score;
+    el('prog').textContent = 'Monster ' + killCount() + '/' + monsters.length + ' · Bos ' + (bossesDone() + (monsters[monsters.length - 1].dead ? 1 : 0)) + '/5';
+    el('btnNotes').textContent = 'Catatan ' + noteCount() + '/' + TOTAL_Q;
+    var raja = monsters.filter(function (m) { return m.boss && m.zi === 4; })[0], o;
+    if (raja.dead) o = 'Semua bos kalah. Jelajahi sisa monster dan lengkapi Buku Catatan.';
+    else if (G.arenaOpen) o = 'Gerbang Singgasana terbuka! Masuk ke tengah peta dan kalahkan Raja Evolusi.';
+    else o = 'Tujuan: bersihkan wilayah, kalahkan bos (' + bossesDone() + '/4) untuk membuka Singgasana Evolusi di tengah peta.';
+    el('objective').textContent = o;
+  }
+  var toastTimer = null, banTimer = null;
+  function toast(msg) {
+    var t = el('toast');
+    t.textContent = msg; t.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('on'); }, 2600);
+  }
+  function banner(name, sub) {
+    el('banName').textContent = name; el('banSub').textContent = sub;
+    var b = el('banner'); b.classList.add('on');
+    clearTimeout(banTimer);
+    banTimer = setTimeout(function () { b.classList.remove('on'); }, 2400);
+  }
+
+  /* ---------- Layar ---------- */
+  function setUI(u) {
+    ui = u;
+    ['start', 'battle', 'notes', 'win'].forEach(function (k) { el(k).hidden = k !== u; });
+    joy.on = false; joy.vx = joy.vy = 0;
+    for (var k in keys) keys[k] = false;
+  }
+  function openStart() {
+    var s = loadSave();
+    var has = s && (s.dead.length || (s.notes && s.notes.length) || s.score > 0);
+    el('savedLine').hidden = !has;
+    el('btnReset').hidden = !has;
+    el('btnReset').textContent = 'Mulai dari awal';
+    el('btnPlay').textContent = has ? 'Lanjutkan Petualangan' : 'Mulai Menjelajah';
+    if (has) el('savedLine').textContent = 'Kemajuan tersimpan: ' + s.dead.length + '/' + monsters.length + ' monster, ' + (s.notes ? s.notes.length : 0) + ' catatan.';
+    setUI('start');
+  }
+
+  /* ---------- Pertarungan ---------- */
+  function renderPips() {
+    var h = '';
+    for (var i = 0; i < B.m.need; i++) h += '<span class="pip' + (i < B.m.need - B.m.got ? ' on' : '') + '"></span>';
+    el('bPips').innerHTML = h;
+  }
+  function renderHint() {
+    var b = el('bHint');
+    b.textContent = '50:50 ×' + G.hints;
+    b.disabled = B.locked || G.hints <= 0 || B.hintUsed;
+  }
+  function startBattle(m) {
+    B = { m: m, q: null, opts: [], locked: false, hintUsed: false, taunt: m.boss ? MONSTERS[m.zi].taunt : pick(TAUNTS) };
+    SFX.alert();
+    el('bImg').innerHTML = MONSTERS[m.zi].svg();
+    el('bName').textContent = m.name;
+    el('bTopic').textContent = MONSTERS[m.zi].topic + (m.boss ? ' · BOS' : '');
+    el('bTaunt').textContent = '“' + B.taunt + '”';
+    setUI('battle');
+    showQuestion();
+  }
+  function showQuestion() {
+    B.q = drawQ(B.m.zi);
+    B.opts = shuffle([B.q.ok].concat(B.q.bad));
+    B.locked = false; B.hintUsed = false;
+    el('bQ').textContent = B.q.q;
+    el('bOpts').innerHTML = B.opts.map(function (t, i) {
+      return '<button type="button" class="opt" data-i="' + i + '"><span class="badge">' + 'ABCD'.charAt(i) + '</span><span class="otext">' + t + '</span></button>';
+    }).join('');
+    el('bFb').hidden = true;
+    renderPips(); renderHint();
+  }
+  function useHint() {
+    if (!B || B.locked || B.hintUsed || G.hints <= 0) return;
+    var wrong = [];
+    B.opts.forEach(function (t, i) { if (t !== B.q.ok) wrong.push(i); });
+    shuffle(wrong).slice(0, 2).forEach(function (i) {
+      var b = el('bOpts').children[i]; b.disabled = true; b.classList.add('dim');
+    });
+    G.hints--; B.hintUsed = true;
+    SFX.pick(); renderHint(); save();
+  }
+  function answer(i) {
+    if (!B || B.locked) return;
+    B.locked = true;
+    var m = B.m, good = B.opts[i] === B.q.ok, btns = el('bOpts').children, k;
+    for (k = 0; k < btns.length; k++) {
+      var b = btns[k];
+      if (B.opts[k] === B.q.ok) { b.classList.add('correct'); b.querySelector('.badge').textContent = '✓'; }
+      else if (k === i) { b.classList.add('wrong'); b.querySelector('.badge').textContent = '✗'; }
+      else b.classList.add('dim');
+      b.disabled = true;
+    }
+    var fb = el('bFb'), A = el('bA'), Bb = el('bB');
+    Bb.hidden = true;
+    if (good) {
+      var gain = 100 + Math.min(G.streak, 4) * 20 + (m.boss ? 50 : 0);
+      G.score += gain; G.streak++; m.got++;
+      G.notes[B.q.q] = 1;
+      fb.className = 'fb ok';
+      if (m.got >= m.need) {
+        el('bFbTitle').textContent = (m.boss ? 'Bos tumbang!' : 'Monster tumbang!') + ' +' + gain + ' poin';
+        A.textContent = 'Lanjut menjelajah';
+        B.next = 'win';
+        SFX.defeat();
+      } else {
+        el('bFbTitle').textContent = 'Serangan kena! +' + gain + ' poin';
+        A.textContent = 'Soal berikutnya';
+        B.next = 'more';
+        SFX.ok();
+      }
+      el('bFbBody').textContent = B.q.why;
+    } else {
+      G.streak = 0; G.hearts--;
+      fb.className = 'fb no';
+      el('bFbBody').textContent = 'Jawaban yang benar: ' + B.q.ok + '. ' + B.q.why;
+      if (G.hearts <= 0) {
+        el('bFbTitle').textContent = 'Nyawamu habis';
+        A.textContent = 'Kembali ke kemah';
+        B.next = 'faint';
+        SFX.lose();
+      } else {
+        el('bFbTitle').textContent = 'Monster menyerang! Nyawa berkurang 1';
+        A.textContent = 'Coba lagi';
+        Bb.hidden = false; Bb.textContent = 'Mundur';
+        B.next = 'retry';
+        SFX.no();
+        deck[m.zi].splice(Math.floor(Math.random() * (deck[m.zi].length + 1)), 0, B.q);
+      }
+    }
+    fb.hidden = false;
+    renderPips(); renderHint(); renderHUD(); save();
+    try { fb.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+  }
+  function burst(x, y, color, n) {
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * 6.283, s = 60 + Math.random() * 140;
+      parts.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.7, max: 0.7, c: color });
+    }
+  }
+  function afterBattle(kind) {
+    var m = B.m;
+    B = null;
+    setUI('play');
+    P.immune = 1.6;
+    if (kind === 'win') {
+      m.dead = true; G.kills++;
+      burst(m.x, m.y, '#ffd166', 26); burst(m.x, m.y, '#ff5f8f', 14);
+      floats.push({ x: m.x, y: m.y - 40, txt: m.boss ? 'BOS KALAH!' : 'Menang!', col: '#ffd166', life: 1.6 });
+      var wasOpen = G.arenaOpen, left = 0;
+      updateWorldState();
+      monsters.forEach(function (o) { if (o.zi === m.zi && !o.boss && !o.dead) left++; });
+      if (m.boss) toast('Bos ' + m.name + ' dikalahkan!');
+      else if (left === 0) toast('Wilayah bersih! Bos ' + MONSTERS[m.zi].name + ' terbangun.');
+      else toast('Sisa monster di wilayah ini: ' + left);
+      if (!wasOpen && G.arenaOpen) setTimeout(function () { banner('Gerbang terbuka!', 'Singgasana Evolusi ada di tengah peta'); SFX.pick(); }, 1200);
+      if (m.boss && m.zi === 4) showWin();
+    } else if (kind === 'retreat') {
+      var dx = P.x - m.x, dy = P.y - m.y, d = Math.hypot(dx, dy) || 1;
+      P.x = clamp(P.x + dx / d * 150, 30, W - 30); P.y = clamp(P.y + dy / d * 150, 30, H - 30);
+      P.immune = 2.4;
+    } else if (kind === 'faint') {
+      G.hearts = MAXH; G.score = Math.max(0, G.score - 50); m.got = 0;
+      P.x = CAMP.x; P.y = CAMP.y - 70; P.immune = 2.4;
+      toast('Kamu pingsan dan dibawa ke kemah. Nyawa pulih, -50 poin.');
+    }
+    renderHUD(); save();
+  }
+  function onNext(which) {
+    SFX.tap();
+    if (!B) return;
+    if (which === 'B') return afterBattle('retreat');
+    if (B.next === 'more' || B.next === 'retry') return showQuestion();
+    afterBattle(B.next);
+  }
+  function showWin() {
+    el('wScore').textContent = G.score; el('wKills').textContent = killCount() + '/' + monsters.length;
+    el('wNotes').textContent = noteCount() + '/' + TOTAL_Q; el('wHearts').textContent = G.hearts + '/' + MAXH;
+    setUI('win');
+  }
+  function openNotes() {
+    var h = '';
+    MONSTERS.forEach(function (M, zi) {
+      var got = M.qs.filter(function (q) { return G.notes[q.q]; });
+      h += '<div><h3>' + ZN[zi].name + ' <small>' + got.length + '/' + M.qs.length + '</small></h3>';
+      if (!got.length) h += '<p class="empty">Belum ada catatan. Kalahkan monster di wilayah ini.</p>';
+      else h += '<ul class="facts">' + got.map(function (q) { return '<li><small>' + q.q + '</small><b>' + q.ok + '</b>. ' + q.why + '</li>'; }).join('') + '</ul>';
+      h += '</div>';
+    });
+    el('notesBody').innerHTML = h;
+    el('notesLead').textContent = 'Setiap jawaban benar menambah satu catatan. Terkumpul ' + noteCount() + ' dari ' + TOTAL_Q + '.';
+    setUI('notes');
+  }
+
+  /* ---------- Pembaruan per bingkai ---------- */
+  function update(dt) {
+    P.t += dt;
+    if (P.immune > 0) P.immune -= dt;
+    var vx = 0, vy = 0;
+    if (keys.a || keys.arrowleft) vx -= 1;
+    if (keys.d || keys.arrowright) vx += 1;
+    if (keys.w || keys.arrowup) vy -= 1;
+    if (keys.s || keys.arrowdown) vy += 1;
+    vx += joy.vx; vy += joy.vy;
+    var mag = Math.hypot(vx, vy);
+    if (mag > 1) { vx /= mag; vy /= mag; mag = 1; }
+    P.moving = mag > 0.05;
+    if (P.moving) {
+      P.x += vx * SPEED * dt; P.y += vy * SPEED * dt;
+      if (vx > 0.1) P.face = 1; else if (vx < -0.1) P.face = -1;
+    }
+    P.x = clamp(P.x, 24, W - 24); P.y = clamp(P.y, 24, H - 24);
+    if (!G.arenaOpen) {
+      var d0 = Math.hypot(P.x - ARENA.x, P.y - ARENA.y), lim = ARENA.r + P.r + 4;
+      if (d0 < lim) { P.x = ARENA.x + (P.x - ARENA.x) / (d0 || 1) * lim; P.y = ARENA.y + (P.y - ARENA.y) / (d0 || 1) * lim; }
+    }
+    var z = zoneAt(P.x, P.y);
+    if (z !== zoneNow) {
+      zoneNow = z;
+      if (z === -1) banner('Kemah Peneliti', 'Nyawa pulih di sini');
+      else banner(ZN[z].name, 'Topik: ' + MONSTERS[z].topic);
+    }
+    if (Math.hypot(P.x - CAMP.x, P.y - CAMP.y) < 110 && G.hearts < MAXH) {
+      G.hearts = MAXH; SFX.pick(); toast('Nyawa pulih di kemah.'); renderHUD(); save();
+    }
+    items.forEach(function (it) {
+      if (it.taken || Math.hypot(P.x - it.x, P.y - it.y) > 28) return;
+      if (it.kind === 'herb') {
+        if (G.hearts >= MAXH) return;
+        G.hearts++; toast('Herbal memulihkan 1 nyawa.');
+      } else { G.hints++; toast('Kristal: bantuan 50:50 bertambah.'); }
+      it.taken = true; SFX.pick(); burst(it.x, it.y, it.kind === 'herb' ? '#5ee0a0' : '#4cc9f0', 12);
+      renderHUD(); save();
+    });
+    var started = false;
+    monsters.forEach(function (m) {
+      if (m.dead || started) return;
+      m.t += dt;
+      var dx = P.x - m.x, dy = P.y - m.y, d = Math.hypot(dx, dy);
+      var chase = m.awake && P.immune <= 0 && d < m.aggro && Math.hypot(P.x - m.hx, P.y - m.hy) < m.leash + m.aggro * 0.6;
+      if (chase && !m.alert) SFX.alert();
+      m.alert = chase;
+      if (chase) {
+        m.x += dx / d * m.speed * dt; m.y += dy / d * m.speed * dt;
+        if (Math.abs(dx) > 4) m.flip = dx < 0;
+      } else {
+        m.wt -= dt;
+        if (m.wt <= 0) {
+          var a = Math.random() * 6.283, rr = Math.random() * m.wander;
+          m.tx = m.hx + Math.cos(a) * rr; m.ty = m.hy + Math.sin(a) * rr; m.wt = 2 + Math.random() * 3;
+        }
+        var ex = m.tx - m.x, ey = m.ty - m.y, ed = Math.hypot(ex, ey);
+        if (ed > 4) { m.x += ex / ed * m.speed * 0.35 * dt; m.y += ey / ed * m.speed * 0.35 * dt; if (Math.abs(ex) > 2) m.flip = ex < 0; }
+      }
+      if (m.awake && P.immune <= 0 && d < P.r + m.r * 0.85) { started = true; startBattle(m); }
+    });
+    parts = parts.filter(function (p) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.94; p.vy *= 0.94; return p.life > 0; });
+    floats = floats.filter(function (f) { f.life -= dt; f.y -= 22 * dt; return f.life > 0; });
+  }
+
+  /* ---------- Gambar ---------- */
+  var cv = el('cv'), ctx = cv.getContext('2d'), mm = el('mm'), mctx = mm.getContext('2d');
+  function resize() {
+    var r = cv.getBoundingClientRect();
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(r.width * DPR)); cv.height = Math.max(1, Math.round(r.height * DPR));
+    VW = r.width; VH = r.height;
+    VS = clamp(Math.min(VW, VH) / 560, 0.62, 1.5);
+  }
+  function drawPlayer(g, x, y) {
+    var bob = P.moving ? Math.sin(P.t * 14) * 2 : 0, leg = P.moving ? Math.sin(P.t * 14) * 3 : 0;
+    g.save(); g.translate(x, y);
+    g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(0, 13, 12, 5, 0, 0, 6.3); g.fill();
+    if (P.immune > 0 && Math.floor(P.t * 10) % 2) g.globalAlpha = 0.45;
+    g.scale(P.face, 1);
+    g.fillStyle = '#8b6cf0'; g.fillRect(-14, -6 + bob, 7, 15);
+    g.fillStyle = '#2a2358'; g.fillRect(-6, 6, 5, 7 + leg); g.fillRect(1, 6, 5, 7 - leg);
+    g.fillStyle = '#f3efff'; g.fillRect(-8, -8 + bob, 16, 17);
+    g.fillStyle = '#4cc9f0'; g.fillRect(-1, -6 + bob, 2, 12);
+    g.fillStyle = '#f2c9a0'; g.beginPath(); g.arc(0, -15 + bob, 8, 0, 6.3); g.fill();
+    g.fillStyle = '#ff5f8f'; g.beginPath(); g.arc(0, -17 + bob, 8, Math.PI, 0); g.fill(); g.fillRect(2, -18 + bob, 11, 3);
+    g.fillStyle = '#130f2b'; g.fillRect(3, -15 + bob, 2, 3);
+    g.restore();
+  }
+  function drawMonster(g, m) {
+    var img = sprites[m.zi], s = m.r * 2.9, bob = Math.sin(T * 2 + m.t) * 3;
+    g.save(); g.translate(m.x, m.y);
+    g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(0, m.r * 0.7, m.r * 0.9, m.r * 0.3, 0, 0, 6.3); g.fill();
+    if (m.boss && !m.awake) g.globalAlpha = 0.5;
+    if (m.boss && m.awake) { g.strokeStyle = 'rgba(255,209,102,' + (0.5 + Math.sin(T * 3) * 0.25).toFixed(2) + ')'; g.lineWidth = 4; g.beginPath(); g.arc(0, 0, m.r + 14, 0, 6.3); g.stroke(); }
+    g.save();
+    if (m.flip) g.scale(-1, 1);
+    if (img.complete && img.naturalWidth) g.drawImage(img, -s / 2, -s / 2 - 6 + bob, s, s);
+    else { g.fillStyle = '#8b6cf0'; g.beginPath(); g.arc(0, bob, m.r, 0, 6.3); g.fill(); }
+    g.restore();
+    g.globalAlpha = 1;
+    g.textAlign = 'center';
+    if (m.boss && !m.awake) {
+      g.fillStyle = '#ffd166'; g.fillRect(-7, -m.r - 30, 14, 11); g.strokeStyle = '#ffd166'; g.lineWidth = 3; g.beginPath(); g.arc(0, -m.r - 30, 5, Math.PI, 0); g.stroke();
+      g.font = '800 13px Nunito, sans-serif'; g.fillStyle = '#fff'; g.fillText('Segel: ' + (m.sealLeft || 0) + ' monster lagi', 0, -m.r - 38);
+    } else if (m.alert) {
+      g.font = '800 22px Lilita One, sans-serif'; g.fillStyle = '#ff6b6b'; g.fillText('!', 0, -m.r - 14);
+    } else if (m.boss || Math.hypot(P.x - m.x, P.y - m.y) < 240) {
+      g.font = '800 13px Nunito, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(19,15,43,.85)'; g.strokeText(m.name, 0, -m.r - 12); g.fillStyle = m.boss ? '#ffd166' : '#fff'; g.fillText(m.name, 0, -m.r - 12);
+    }
+    g.restore();
+  }
+  function drawItem(g, it) {
+    var b = Math.sin(T * 3 + it.t) * 3;
+    g.save(); g.translate(it.x, it.y + b);
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(0, 12 - b, 8, 3, 0, 0, 6.3); g.fill();
+    if (it.kind === 'herb') {
+      g.fillStyle = '#5ee0a0';
+      g.beginPath(); g.ellipse(-6, -2, 6, 10, -0.5, 0, 6.3); g.fill();
+      g.beginPath(); g.ellipse(6, -2, 6, 10, 0.5, 0, 6.3); g.fill();
+      g.fillStyle = '#9af5c4'; g.beginPath(); g.ellipse(0, -6, 5, 11, 0, 0, 6.3); g.fill();
+      g.fillStyle = '#ff5f8f'; g.beginPath(); g.arc(0, -14, 3, 0, 6.3); g.fill();
+    } else {
+      g.shadowColor = '#4cc9f0'; g.shadowBlur = 12;
+      g.fillStyle = '#6fe3ff'; g.beginPath(); g.moveTo(0, -14); g.lineTo(9, -2); g.lineTo(0, 10); g.lineTo(-9, -2); g.closePath(); g.fill();
+      g.shadowBlur = 0; g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(-1, -10, 2, 7);
+    }
+    g.restore();
+  }
+  function drawCamp(g) {
+    var tx = CAMP.x - 60, ty = CAMP.y - 30, fx = CAMP.x + 40, fy = CAMP.y;
+    g.fillStyle = '#c4521a'; g.beginPath(); g.moveTo(tx - 40, ty + 36); g.lineTo(tx, ty - 34); g.lineTo(tx + 40, ty + 36); g.closePath(); g.fill();
+    g.fillStyle = '#ff8c42'; g.beginPath(); g.moveTo(tx - 14, ty + 36); g.lineTo(tx, ty - 8); g.lineTo(tx + 14, ty + 36); g.closePath(); g.fill();
+    g.fillStyle = '#5a3a24'; g.fillRect(fx - 16, fy + 6, 32, 6);
+    var f = 10 + Math.sin(T * 12) * 3;
+    g.fillStyle = '#ff8c42'; g.beginPath(); g.ellipse(fx, fy - 2, 9, f + 4, 0, 0, 6.3); g.fill();
+    g.fillStyle = '#ffd166'; g.beginPath(); g.ellipse(fx, fy, 5, f, 0, 0, 6.3); g.fill();
+    g.fillStyle = 'rgba(255,200,120,.12)'; g.beginPath(); g.arc(fx, fy, 60 + Math.sin(T * 5) * 4, 0, 6.3); g.fill();
+    g.font = '800 13px Nunito, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText('Kemah', CAMP.x, CAMP.y + 70);
+  }
+  function drawBarrier(g) {
+    if (G.arenaOpen) return;
+    var pulse = 0.55 + Math.sin(T * 3) * 0.2;
+    g.save();
+    g.shadowColor = '#8b6cf0'; g.shadowBlur = 24;
+    g.strokeStyle = 'rgba(160,120,255,' + pulse.toFixed(2) + ')'; g.lineWidth = 10;
+    g.beginPath(); g.arc(ARENA.x, ARENA.y, ARENA.r, 0, 6.3); g.stroke();
+    g.restore();
+    g.font = '800 14px Nunito, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(19,15,43,.9)';
+    var tx = 'Segel Singgasana: kalahkan ' + (4 - bossesDone()) + ' bos lagi';
+    g.strokeText(tx, ARENA.x, ARENA.y + ARENA.r + 30); g.fillStyle = '#d9ccff'; g.fillText(tx, ARENA.x, ARENA.y + ARENA.r + 30);
+  }
+  function render() {
+    if (cv.width < 2) return;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillStyle = '#130f2b'; ctx.fillRect(0, 0, VW, VH);
+    var vw = VW / VS, vh = VH / VS;
+    var cx = vw >= W ? (W - vw) / 2 : clamp(P.x - vw / 2, 0, W - vw);
+    var cy = vh >= H ? (H - vh) / 2 : clamp(P.y - vh / 2, 0, H - vh);
+    ctx.save();
+    ctx.scale(VS, VS); ctx.translate(-cx, -cy);
+    ctx.drawImage(world, 0, 0);
+    drawBarrier(ctx);
+    drawCamp(ctx);
+    items.forEach(function (it) { if (!it.taken && it.x > cx - 40 && it.x < cx + vw + 40 && it.y > cy - 40 && it.y < cy + vh + 40) drawItem(ctx, it); });
+    var ents = [{ y: P.y, p: true }];
+    monsters.forEach(function (m) { if (!m.dead && m.x > cx - 120 && m.x < cx + vw + 120 && m.y > cy - 120 && m.y < cy + vh + 120) ents.push({ y: m.y, m: m }); });
+    ents.sort(function (a, b) { return a.y - b.y; });
+    ents.forEach(function (e) { if (e.p) drawPlayer(ctx, P.x, P.y); else drawMonster(ctx, e.m); });
+    parts.forEach(function (p) { ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, 6.3); ctx.fill(); });
+    ctx.globalAlpha = 1;
+    floats.forEach(function (f) {
+      ctx.globalAlpha = Math.min(1, f.life); ctx.font = '400 22px Lilita One, sans-serif'; ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(19,15,43,.9)'; ctx.strokeText(f.txt, f.x, f.y); ctx.fillStyle = f.col; ctx.fillText(f.txt, f.x, f.y);
+    });
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    if (joy.on) {
+      ctx.strokeStyle = 'rgba(243,239,255,.35)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(joy.ax, joy.ay, 55, 0, 6.3); ctx.stroke();
+      ctx.fillStyle = 'rgba(243,239,255,.4)'; ctx.beginPath(); ctx.arc(joy.ax + joy.sx, joy.ay + joy.sy, 22, 0, 6.3); ctx.fill();
+    }
+    mctx.drawImage(mmBase, 0, 0);
+    var kx = 150 / W, ky = 115 / H;
+    mctx.strokeStyle = 'rgba(255,255,255,.5)'; mctx.lineWidth = 1; mctx.strokeRect(cx * kx, cy * ky, vw * kx, vh * ky);
+    monsters.forEach(function (m) {
+      if (m.dead) return;
+      mctx.fillStyle = m.boss ? '#ffd166' : '#ff6b6b';
+      mctx.beginPath(); mctx.arc(m.x * kx, m.y * ky, m.boss ? 3.5 : 2, 0, 6.3); mctx.fill();
+    });
+    mctx.fillStyle = '#5ee0a0'; mctx.fillRect(CAMP.x * kx - 2, CAMP.y * ky - 2, 4, 4);
+    mctx.fillStyle = '#fff'; mctx.beginPath(); mctx.arc(P.x * kx, P.y * ky, 3, 0, 6.3); mctx.fill();
+  }
+  var last = 0;
+  function frame(ts) {
+    requestAnimationFrame(frame);
+    var dt = Math.min(0.05, (ts - last) / 1000 || 0);
+    last = ts; T += dt;
+    if (ui === 'play') update(dt);
+    render();
+  }
+
+  /* ---------- Kontrol ---------- */
+  cv.addEventListener('pointerdown', function (e) {
+    if (ui !== 'play') return;
+    var r = cv.getBoundingClientRect();
+    joy.on = true; joy.id = e.pointerId; joy.ax = e.clientX - r.left; joy.ay = e.clientY - r.top; joy.vx = joy.vy = joy.sx = joy.sy = 0;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!joy.on || e.pointerId !== joy.id) return;
+    var r = cv.getBoundingClientRect(), dx = e.clientX - r.left - joy.ax, dy = e.clientY - r.top - joy.ay, d = Math.hypot(dx, dy), mx = 55;
+    if (d < 8) { joy.vx = joy.vy = joy.sx = joy.sy = 0; return; }
+    var k = Math.min(1, d / mx);
+    joy.vx = dx / d * k; joy.vy = dy / d * k;
+    joy.sx = dx / d * Math.min(d, mx); joy.sy = dy / d * Math.min(d, mx);
+  });
+  function endJoy(e) { if (e.pointerId === joy.id) { joy.on = false; joy.vx = joy.vy = 0; } }
+  cv.addEventListener('pointerup', endJoy);
+  cv.addEventListener('pointercancel', endJoy);
+  window.addEventListener('keydown', function (e) {
+    var k = (e.key || '').toLowerCase();
+    if (ui === 'play') {
+      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].indexOf(k) !== -1) { keys[k] = true; e.preventDefault(); }
+    } else if (ui === 'battle' && B && !B.locked) {
+      var n = parseInt(k, 10);
+      if (n >= 1 && n <= 4) { var b = el('bOpts').children[n - 1]; if (b && !b.disabled) answer(n - 1); }
+    }
+  });
+  window.addEventListener('keyup', function (e) { keys[(e.key || '').toLowerCase()] = false; });
+  window.addEventListener('blur', function () { for (var k in keys) keys[k] = false; joy.on = false; joy.vx = joy.vy = 0; });
+
+  el('bOpts').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('.opt') : null;
+    if (b && !b.disabled) answer(parseInt(b.getAttribute('data-i'), 10));
+  });
+  el('bHint').addEventListener('click', useHint);
+  el('bA').addEventListener('click', function () { onNext('A'); });
+  el('bB').addEventListener('click', function () { onNext('B'); });
+  el('btnPlay').addEventListener('click', function () {
+    SFX.tap();
+    var s = loadSave();
+    if (s && (s.dead.length || (s.notes && s.notes.length) || s.score > 0)) applySave(s);
+    updateWorldState(); renderHUD();
+    setUI('play');
+    zoneNow = -2;
+    toast('Geser layar atau tekan W A S D untuk berjalan.');
+  });
+  el('btnReset').addEventListener('click', function () {
+    var b = el('btnReset');
+    if (b.getAttribute('data-sure') !== '1') { b.setAttribute('data-sure', '1'); b.textContent = 'Yakin? Ketuk lagi untuk menghapus'; return; }
+    b.removeAttribute('data-sure');
+    resetGame(); updateWorldState(); renderHUD(); openStart();
+  });
+  el('btnMenu').addEventListener('click', function () { if (ui === 'play') { SFX.tap(); save(); openStart(); } });
+  el('btnNotes').addEventListener('click', function () { if (ui === 'play') { SFX.tap(); openNotes(); } });
+  el('btnNotesClose').addEventListener('click', function () { SFX.tap(); setUI('play'); });
+  el('btnWinClose').addEventListener('click', function () { SFX.tap(); setUI('play'); renderHUD(); });
+  el('btnSound').addEventListener('click', function () {
+    muted = !muted; store('biomonster-muted', muted ? '1' : '0');
+    el('btnSound').textContent = muted ? 'Suara: mati' : 'Suara: nyala';
+    el('btnSound').setAttribute('aria-pressed', muted ? 'false' : 'true');
+    SFX.tap();
+  });
+  el('btnSound').textContent = muted ? 'Suara: mati' : 'Suara: nyala';
+  el('btnSound').setAttribute('aria-pressed', muted ? 'false' : 'true');
+
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(el('stage'));
+  window.addEventListener('resize', resize);
+  resize();
+  updateWorldState(); renderHUD(); openStart();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</html>
